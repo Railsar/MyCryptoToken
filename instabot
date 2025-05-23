@@ -1,0 +1,79 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import time
+
+# Ваши данные Instagram
+INSTAGRAM_USERNAME = 'urbanpoetry4'
+INSTAGRAM_PASSWORD = 'T035ao73'
+MESSAGE_TEXT = 'Оформите карту Альфа-Банка - выпуск и обслуживание бесплатны навсегда, а доставку курьером можно получить бесплатно прямо на дом или в офис.'
+
+# Инициализация драйвера
+options = Options()
+options.add_argument('--disable-notifications')
+service = Service('chromedriver')  # Укажите путь к chromedriver, если требуется
+browser = webdriver.Chrome(service=service, options=options)
+
+def login(username, password):
+    browser.get('https://www.instagram.com/accounts/login/')
+    time.sleep(3)
+    username_input = browser.find_element(By.NAME, 'username')
+    password_input = browser.find_element(By.NAME, 'password')
+    username_input.send_keys(username)
+    password_input.send_keys(password)
+    password_input.send_keys(Keys.RETURN)
+    time.sleep(5)
+
+def get_followers():
+    browser.get(f'https://www.instagram.com/{INSTAGRAM_USERNAME}/followers/')
+    time.sleep(3)
+    followers_popup = browser.find_element(By.XPATH, '//div[@role="dialog"]//ul')
+    followers = set()
+    last_height = 0
+    while True:
+        browser.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', followers_popup)
+        time.sleep(2)
+        new_height = browser.execute_script('return arguments[0].scrollHeight', followers_popup)
+        if new_height == last_height:
+            break
+        last_height = new_height
+        followers_elements = followers_popup.find_elements(By.TAG_NAME, 'li')
+        for elem in followers_elements:
+            try:
+                user = elem.find_element(By.TAG_NAME, 'a').get_attribute('href').split('/')[-2]
+                followers.add(user)
+            except:
+                continue
+    return list(followers)
+
+def send_message(user, message):
+    browser.get(f'https://www.instagram.com/direct/new/')
+    time.sleep(3)
+    to_input = browser.find_element(By.NAME, 'queryBox')
+    to_input.send_keys(user)
+    time.sleep(2)
+    user_select = browser.find_element(By.XPATH, f'//div[text()="{user}"]')
+    user_select.click()
+    next_button = browser.find_element(By.XPATH, '//div[text()="Next"]')
+    next_button.click()
+    time.sleep(3)
+    message_input = browser.find_element(By.TAG_NAME, 'textarea')
+    message_input.send_keys(message)
+    message_input.send_keys(Keys.RETURN)
+    time.sleep(2)
+
+# Основной скрипт
+login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+followers = get_followers()
+
+# Ограничение на количество сообщений в день (например, 50)
+max_messages_per_day = 50
+
+for i, follower in enumerate(followers):
+    if i >= max_messages_per_day:
+        break
+    send_message(follower, MESSAGE_TEXT)
+
+browser.quit()
